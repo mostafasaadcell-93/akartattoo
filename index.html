@@ -112,7 +112,7 @@ h3{font-family:var(--display);font-weight:400;font-size:1.7rem;line-height:1;let
 
 /* hero */
 .hero{position:relative;min-height:100svh;padding:118px 0 3vw;display:flex;flex-direction:column;justify-content:space-between;overflow:hidden}
-.hero-top{width:100%;display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:40px;align-items:start}
+.hero-top{width:100%;position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:40px;align-items:start}
 .hero-where{color:var(--grey);font-size:.95rem;font-weight:600;margin-bottom:22px;display:flex;align-items:center;gap:10px}
 .hero-where i{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px rgba(98,210,154,.16)}
 .hero-where i.closed{background:#777;box-shadow:none}
@@ -128,7 +128,10 @@ h3{font-family:var(--display);font-weight:400;font-size:1.7rem;line-height:1;let
 .card.c2{left:34%;top:0;width:35%;aspect-ratio:3/4.3}
 .card.c3{right:0;top:24%;width:28%;aspect-ratio:3/4}
 .card figcaption{position:absolute;left:10px;bottom:10px;font-size:.76rem;font-weight:600;color:#fff;background:rgba(0,0,0,.55);padding:4px 10px;border-radius:999px;backdrop-filter:blur(6px)}
-.hero-name{font-family:var(--display);font-weight:400;font-size:min(25.6vw,38vh);line-height:.86;letter-spacing:-.005em;white-space:nowrap;margin:clamp(18px,2.4vw,44px) 0 0 -0.4vw;text-align:center;position:relative;z-index:3;mix-blend-mode:difference;color:var(--bone);pointer-events:none;user-select:none}
+.hero-name{font-family:var(--display);font-weight:400;font-size:min(25.6vw,38vh);line-height:.86;letter-spacing:-.005em;white-space:nowrap;margin:clamp(18px,2.4vw,44px) 0 0 -0.4vw;text-align:center;position:relative;z-index:1;letter-spacing:0;color:var(--bone);pointer-events:none;user-select:none}
+.hn-text{visibility:hidden}
+.hn-base{display:inline-block;width:0;height:0;vertical-align:baseline}
+.hn-svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 .hero-name span{display:inline-block}
 @media(max-width:920px){
   .hero{padding-top:100px}
@@ -546,7 +549,7 @@ footer a:hover,footer button:hover{color:#fff}
       <figure class="card c3 ink" style="--d:.3s"><img data-img="cherry1" alt="Cherry blossom back piece with red flowers and torii gate"><figcaption>Cherry blossom back</figcaption></figure>
     </div>
   </div>
-  <h1 class="hero-name" aria-label="Ali Akar"><span class="ink" style="--d:.0s">A</span><span class="ink" style="--d:.08s">L</span><span class="ink" style="--d:.16s">I</span>&nbsp;<span class="ink" style="--d:.28s">A</span><span class="ink" style="--d:.36s">K</span><span class="ink" style="--d:.44s">A</span><span class="ink" style="--d:.52s">R</span></h1>
+  <h1 class="hero-name" aria-label="Ali Akar"><span class="hn-text">ALI AKAR<i class="hn-base"></i></span><svg class="hn-svg" aria-hidden="true"></svg></h1>
 </section>
 
 <section class="sec" id="styles">
@@ -1503,11 +1506,11 @@ const io=new IntersectionObserver(es=>es.forEach(e=>{
 $$(".drips").forEach(el=>io.observe(el));
 pieceEls.forEach((el,i)=>{const ph=el.querySelector(".ink");ph.style.setProperty("--d",(i%3)*0.12+"s");io.observe(ph)});
 
-function revealHero(){introDone=true;$$(".hero .ink").forEach(el=>el.classList.add("inked"))}
+function revealHero(){introDone=true;$$(".hero .ink").forEach(el=>el.classList.add("inked"));HeroInk.start()}
 const pre=$("#pre");
 let introRaf=0;
 function endIntro(){if(!pre||pre.classList.contains("out"))return;cancelAnimationFrame(introRaf);pre.classList.add("out");document.body.classList.remove("locked");setTimeout(()=>pre.remove(),600);revealHero()}
-if(REDUCE||!pre){if(pre)pre.remove();document.body.classList.remove("locked");$$(".ink").forEach(el=>el.classList.add("inked"))}
+if(REDUCE||!pre){if(pre)pre.remove();document.body.classList.remove("locked");$$(".ink").forEach(el=>el.classList.add("inked"));introDone=true;setTimeout(()=>HeroInk.start(),0)}
 else{
   $("#skipIntro").addEventListener("click",endIntro);
   const fontReady=document.fonts&&document.fonts.load?Promise.race([document.fonts.load('280px "Anton"'),new Promise(r=>setTimeout(r,700))]):Promise.resolve();
@@ -1579,15 +1582,145 @@ function runIntro(){
   introRaf=requestAnimationFrame(frame);
 }
 
+/* ---------- hero: name as a glass of ink, with endless pouring ---------- */
+const HeroInk=(()=>{
+  const BONE="#ece8e1";
+  let G=null,running=false,started=false,visible=true,raf=0,T0=0,last=0;
+  let streams=[],drops=[],drips=[],chars=[],lastSplash=0;
+  const lerp=(a,b,t)=>a+(b-a)*t, cl=t=>Math.max(0,Math.min(1,t)), ein=t=>t*t, eout=t=>1-Math.pow(1-t,3);
+  const rnd=(a,b)=>a+Math.random()*(b-a);
+  function layout(){
+    const h1=$(".hero-name"),span=$(".hn-text"),svg=$(".hn-svg"),hero=$(".hero");
+    if(!h1||!svg)return;
+    const hr=h1.getBoundingClientRect(),sr=span.getBoundingClientRect(),her=hero.getBoundingClientRect();
+    if(!hr.width)return;
+    const F=parseFloat(getComputedStyle(h1).fontSize);
+    let fa=F*1.17,capH=F*.86;
+    try{const c=document.createElement("canvas").getContext("2d");c.font=`${F}px Anton`;
+      const m=c.measureText("ALI AKAR");if(m.fontBoundingBoxAscent)fa=m.fontBoundingBoxAscent;
+      const a=c.measureText("A");if(a.actualBoundingBoxAscent)capH=a.actualBoundingBoxAscent}catch(e){}
+    const br=$(".hn-base").getBoundingClientRect();
+    const W=hr.width,H=hr.height,base=br.top-hr.top,cx=(sr.left-hr.left)+(br.left-sr.left)/2;
+    svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    const t=`<text x="${cx}" y="${base}" text-anchor="middle" style="font-family:Anton,Impact,sans-serif;font-size:${F}px">ALI AKAR</text>`;
+    svg.innerHTML=`<defs><clipPath id="hnClip">${t}</clipPath>
+      <linearGradient id="hnStream" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${BONE}" stop-opacity="0"/><stop offset=".28" stop-color="${BONE}" stop-opacity="1"/></linearGradient></defs>
+      <g class="hn-streams"></g>
+      <g clip-path="url(#hnClip)"><path class="hn-liquid" fill="${BONE}"/></g>
+      <g class="hn-outline" fill="none" stroke="${BONE}" stroke-opacity=".5" stroke-width="1.3">${t}</g>
+      <g class="hn-drips" fill="${BONE}"></g><g class="hn-drops" fill="${BONE}"></g>`;
+    const tc=$(".hero-top > div").getBoundingClientRect();
+    const outlineText=svg.querySelector(".hn-outline text");
+    chars=[];
+    for(let i=0;i<8;i++){if(i===3)continue;try{const e=outlineText.getExtentOfChar(i);chars.push({l:e.x,w:e.width})}catch(e){}}
+    G={svg,F,W,H,base,capTop:base-capH,heroTop:(her.top+(innerWidth>920?86:70))-hr.top,heroBottom:her.bottom-hr.top,
+       col:{l:tc.left-hr.left-24,r:tc.right-hr.left+24,b:tc.bottom-hr.top+18},
+       liquid:svg.querySelector(".hn-liquid"),streamG:svg.querySelector(".hn-streams"),dripG:svg.querySelector(".hn-drips"),dropG:svg.querySelector(".hn-drops"),
+       sw:Math.max(4,Math.min(11,F*.022))};
+    const n=W>900?3:2;
+    streams=[];for(let i=0;i<n;i++)streams.push(newStream(i*900));
+    drips=chars.map(c=>({c,next:performance.now()+rnd(400,3500),phase:"idle"}));
+    drops=[];
+    if(!running)draw(performance.now(),true);
+  }
+  function pickX(){
+    const c=chars[Math.floor(Math.random()*chars.length)];
+    // pour into the thick part of a letter
+    return c.l+c.w*rnd(.25,.75);
+  }
+  function newStream(delay){return{phase:"off",until:performance.now()+delay,x:0,top:0,start:0,end:0}}
+  function surface(now){
+    const t=now-T0;
+    const intro=REDUCE?1:eout(cl(t/2200));
+    const fill=intro*(0.8+0.05*Math.sin(t/2600)+0.025*Math.sin(t/1100));
+    return lerp(G.base+G.F*.03,G.capTop,fill);
+  }
+  function wavePath(level,t){
+    const a=G.F*.016;let d=`M-20 ${level.toFixed(1)}`;
+    for(let x=-20;x<=G.W+20;x+=Math.max(14,G.W/90)){
+      const y=level+Math.sin(x/(G.F*.18)+t/520)*a+Math.sin(x/(G.F*.07)-t/310)*a*.4;
+      d+=` L${x.toFixed(0)} ${y.toFixed(1)}`;
+    }
+    return d+` L${G.W+20} ${G.H+40} L-20 ${G.H+40} Z`;
+  }
+  function draw(now,still){
+    if(!G)return;
+    const t=now-T0,dt=Math.min(40,now-last)/16.67;last=now;
+    const level=surface(now);
+    G.liquid.setAttribute("d",wavePath(level,still?0:t));
+    if(still||REDUCE){G.streamG.innerHTML="";G.dripG.innerHTML="";G.dropG.innerHTML="";return}
+    // streams
+    let sHtml="";
+    streams.forEach(s=>{
+      if(s.phase==="off"&&now>=s.until){
+        s.x=pickX();s.top=(s.x>G.col.l&&s.x<G.col.r)?G.col.b:G.heroTop;
+        if(s.top>level-30)s.top=Math.min(G.heroTop,level-60);
+        s.phase="fall";s.start=now;s.until=now+rnd(2600,5200);
+      }
+      if(s.phase==="off")return;
+      const len=level-s.top;let top=s.top,bot=level;
+      if(s.phase==="fall"){const p=cl((now-s.start)/420);bot=s.top+len*ein(p);if(p>=1)s.phase="pour"}
+      if(s.phase==="pour"&&now>=s.until){s.phase="tail";s.start=now}
+      if(s.phase==="tail"){const p=cl((now-s.start)/380);top=s.top+len*ein(p);if(p>=1){s.phase="off";s.until=now+rnd(700,2600);return}}
+      if(s.phase!=="fall"&&now-lastSplash>55){lastSplash=now;
+        drops.push({x:s.x+rnd(-3,3),y:level,vx:rnd(-2.6,2.6),vy:-rnd(1.5,4.2),r:rnd(1,G.sw*.45),splash:true,lv:level});}
+      const w=G.sw*(1+Math.sin(now/90+s.x)*.08),wob=Math.sin(now/120+s.x)*1.2;
+      sHtml+=`<path fill="url(#hnStream)" d="M${(s.x-w/2+wob).toFixed(1)} ${top.toFixed(1)} L${(s.x+w/2+wob).toFixed(1)} ${top.toFixed(1)} L${(s.x+w*.62).toFixed(1)} ${bot.toFixed(1)} Q${s.x.toFixed(1)} ${(bot+w).toFixed(1)} ${(s.x-w*.62).toFixed(1)} ${bot.toFixed(1)} Z"/>`;
+    });
+    G.streamG.innerHTML=sHtml;
+    // drips forming under the letters, then letting go
+    let dHtml="";
+    drips.forEach(d=>{
+      if(d.phase==="idle"&&now>=d.next){d.phase="grow";d.start=now;d.x=d.c.l+d.c.w*rnd(.15,.85);d.w=rnd(G.sw*.6,G.sw*1.2);d.L=rnd(G.F*.03,G.F*.08)}
+      if(d.phase==="grow"){
+        const p=cl((now-d.start)/900),L=d.L*eout(p);
+        dHtml+=`<path d="M${(d.x-d.w/2).toFixed(1)} ${G.base-3} V${(G.base+L).toFixed(1)} a${(d.w/2).toFixed(1)} ${(d.w/2).toFixed(1)} 0 0 0 ${d.w.toFixed(1)} 0 V${G.base-3}Z"/><circle cx="${d.x.toFixed(1)}" cy="${(G.base+L).toFixed(1)}" r="${(d.w*.62).toFixed(1)}"/>`;
+        if(p>=1){d.phase="back";d.start=now;drops.push({x:d.x,y:G.base+d.L,vx:0,vy:.6,r:d.w*.62,fall:true,y0:G.base+d.L})}
+      } else if(d.phase==="back"){
+        const p=cl((now-d.start)/260),L=d.L*(1-eout(p))*.55;
+        if(L>.5)dHtml+=`<path d="M${(d.x-d.w/2).toFixed(1)} ${G.base-3} V${(G.base+L).toFixed(1)} a${(d.w/2).toFixed(1)} ${(d.w/2).toFixed(1)} 0 0 0 ${d.w.toFixed(1)} 0 V${G.base-3}Z"/>`;
+        if(p>=1){d.phase="idle";d.next=now+rnd(1800,6000)}
+      }
+    });
+    G.dripG.innerHTML=dHtml;
+    // droplets
+    const maxFall=innerWidth>920?G.heroBottom-G.base+40:G.F*.55;
+    drops=drops.filter(p=>{
+      p.vy+=(p.fall?.42:.3)*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;
+      if(p.splash)return !(p.vy>0&&p.y>p.lv+2);
+      return p.y-p.y0<maxFall;
+    });
+    G.dropG.innerHTML=drops.map(p=>{
+      const op=p.fall?Math.max(0,1-(p.y-p.y0)/maxFall*.9):1;
+      const ry=p.fall?p.r*Math.min(1.8,1+p.vy*.05):p.r;
+      return `<ellipse cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" rx="${p.r.toFixed(1)}" ry="${ry.toFixed(1)}" opacity="${op.toFixed(2)}"/>`;
+    }).join("");
+  }
+  function loop(now){draw(now,false);if(running)raf=requestAnimationFrame(loop)}
+  function play(){if(running||!started||!visible||document.hidden||REDUCE)return;running=true;last=performance.now();raf=requestAnimationFrame(loop)}
+  function pause(){running=false;cancelAnimationFrame(raf)}
+  function start(){
+    if(started)return;started=true;T0=performance.now();layout();
+    if(REDUCE){draw(performance.now(),true);return}
+    streams.forEach((s,i)=>s.until=performance.now()+i*350);
+    play();
+  }
+  const hero=$(".hero");
+  new IntersectionObserver(es=>{visible=es[0].isIntersecting;visible?play():pause()}).observe(hero);
+  document.addEventListener("visibilitychange",()=>document.hidden?pause():play());
+  return{layout,start};
+})();
+
 /* ---------- fit hero name to the space left on screen ---------- */
 function fitName(){
   const n=$(".hero-name");if(!n)return;
-  if(innerWidth<=920){n.style.fontSize="";return}
+  if(innerWidth<=920){n.style.fontSize="";HeroInk.layout();return}
   const topEnd=$(".hero-top").getBoundingClientRect().bottom+scrollY;
   const gap=parseFloat(getComputedStyle(n).marginTop)||0;
   const avail=innerHeight-topEnd-gap-Math.max(16,innerWidth*0.03);
   const size=Math.max(innerWidth*0.14,Math.min(innerWidth*0.256,avail/0.86));
   n.style.fontSize=size+"px";
+  HeroInk.layout();
 }
 function fitFoot(){
   const el=$("#footBig");if(!el)return;const box=el.parentElement;
