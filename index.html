@@ -404,7 +404,9 @@ textarea.field{min-height:110px;resize:vertical}
 @media(max-width:900px){.visit-grid{grid-template-columns:1fr}.facts div{grid-template-columns:100px 1fr}}
 
 footer{border-top:1px solid var(--line);padding:60px 0 110px;overflow:hidden}
-footer .big{font-family:var(--display);font-size:22vw;line-height:.8;color:transparent;-webkit-text-stroke:1.5px #3a3a3a;white-space:nowrap;margin-bottom:40px;letter-spacing:-.005em}
+footer .big-wrap{margin-bottom:44px}
+footer .big{display:block;width:max-content;margin:0 auto;font-family:var(--display);font-size:16vw;line-height:.9;white-space:nowrap;letter-spacing:-.005em;color:#fff;-webkit-text-stroke:1.5px #fff;animation:blink 1.6s steps(1,end) infinite}
+@keyframes blink{0%{color:#fff}50%{color:transparent}}
 footer .row{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;color:var(--grey);font-size:.92rem}
 footer nav{display:flex;gap:22px;flex-wrap:wrap}
 footer a,footer button{text-decoration:none;color:var(--grey);font-weight:600}
@@ -486,6 +488,7 @@ footer a:hover,footer button:hover{color:#fff}
   .ink{-webkit-mask-image:none;mask-image:none}
   #pre{display:none}
   .drips .d{transform:none}
+  footer .big{color:#fff}
 }
 </style>
 </head>
@@ -825,7 +828,7 @@ footer a:hover,footer button:hover{color:#fff}
 </main>
 
 <footer>
-  <div class="big" aria-hidden="true">AKAR TATTOO</div>
+  <div class="wrap big-wrap"><span class="big" id="footBig" aria-hidden="true">AKAR TATTOO</span></div>
   <div class="wrap row">
     <span>Ali Akar, Hlaliyeh, Saida</span>
     <nav aria-label="Footer">
@@ -1586,7 +1589,14 @@ function fitName(){
   const size=Math.max(innerWidth*0.14,Math.min(innerWidth*0.256,avail/0.86));
   n.style.fontSize=size+"px";
 }
-fitName();addEventListener("resize",fitName);
+function fitFoot(){
+  const el=$("#footBig");if(!el)return;const box=el.parentElement;
+  const cs=getComputedStyle(box);const avail=box.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  el.style.fontSize="100px";const w=el.getBoundingClientRect().width;
+  if(w)el.style.fontSize=(100*avail/w*0.995)+"px";
+}
+fitName();fitFoot();addEventListener("resize",()=>{fitName();fitFoot()});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitFoot);
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(fitName);
 
 /* ---------- chrome ---------- */
